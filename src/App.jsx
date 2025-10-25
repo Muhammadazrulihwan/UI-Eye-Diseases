@@ -114,7 +114,7 @@ const EyeDiseaseDetection = () => {
           </p>
           <div className="flex items-center justify-center mt-3 text-sm text-gray-500">
             <Activity className="w-4 h-4 mr-1" />
-            <span>Powered by ResNet50 + XGBoost</span>
+            <span>Powered by Muhammad Azrul Ihwan</span>
           </div>
         </div>
 
