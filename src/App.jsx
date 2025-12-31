@@ -34,6 +34,18 @@ const EyeDiseaseDetection = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validasi ukuran file (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Ukuran file terlalu besar. Maksimal 10MB');
+        return;
+      }
+
+      // Validasi tipe file
+      if (!file.type.startsWith('image/')) {
+        setError('File harus berupa gambar (PNG, JPG, JPEG)');
+        return;
+      }
+
       setSelectedImage(file);
       setError(null);
       setResult(null);
@@ -55,43 +67,73 @@ const EyeDiseaseDetection = () => {
     setLoading(true);
     setError(null);
 
-    // API URL dari environment variable atau default localhost
-    const API_URL = import.meta.env.VITE_API_URL;
-    if (!API_URL) {
-    throw new Error(
-      'VITE_API_URL is not defined. Please set it in Vercel Environment Variables.'
-    );
-  }
+    // Ambil API URL dari environment variable dengan fallback
+    const API_URL = import.meta.env.VITE_API_URL || 'https://api.eyedisease.kusumanoor.com';
+    
+    console.log('🔗 API URL:', API_URL);
+    console.log('📁 File:', selectedImage.name, '-', (selectedImage.size / 1024).toFixed(2), 'KB');
     
     const formData = new FormData();
     formData.append('file', selectedImage);
 
     try {
+      console.log('📤 Sending request to:', `${API_URL}/predict`);
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 detik timeout
+
       const response = await fetch(`${API_URL}/predict`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
+      console.log('📥 Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('✅ Response data:', data);
       
-      // FIX: Sesuaikan dengan response backend
+      // Sesuaikan dengan format response backend
       if (data.status === 'success' && data.result) {
         setResult({
           prediction: data.result.disease,
           confidence: data.result.confidence / 100 // Convert ke decimal (95.5 -> 0.955)
         });
+        console.log('🎯 Prediction:', data.result.disease, '-', data.result.confidence + '%');
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('Format response tidak valid dari server');
       }
       
       setLoading(false);
     } catch (err) {
-      console.error('Error:', err);
-      setError(`Gagal menganalisis gambar: ${err.message}. Pastikan backend berjalan di ${API_URL}`);
+      console.error('❌ Error:', err);
+      
+      let errorMessage = 'Gagal menganalisis gambar';
+      
+      if (err.name === 'AbortError') {
+        errorMessage = 'Request timeout. Silakan coba lagi.';
+      } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+      } else {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -223,6 +265,7 @@ const EyeDiseaseDetection = () => {
                 <div className="text-center">
                   <Eye className="w-20 h-20 mx-auto mb-4 opacity-30" />
                   <p className="text-lg">Hasil analisis akan muncul di sini</p>
+                  <p className="text-sm mt-2">Upload gambar dan klik "Analisis Gambar"</p>
                 </div>
               </div>
             )}
@@ -233,6 +276,7 @@ const EyeDiseaseDetection = () => {
                   <Activity className="w-16 h-16 mx-auto mb-4 text-indigo-600 animate-spin" />
                   <p className="text-lg text-gray-600">Sedang menganalisis gambar...</p>
                   <p className="text-sm text-gray-500 mt-2">Ekstraksi fitur menggunakan ResNet50</p>
+                  <p className="text-xs text-gray-400 mt-1">Mohon tunggu hingga 60 detik</p>
                 </div>
               </div>
             )}
