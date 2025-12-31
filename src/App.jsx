@@ -56,7 +56,12 @@ const EyeDiseaseDetection = () => {
     setError(null);
 
     // API URL dari environment variable atau default localhost
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const API_URL = import.meta.env.VITE_API_URL;
+    if (!API_URL) {
+    throw new Error(
+      'VITE_API_URL is not defined. Please set it in Vercel Environment Variables.'
+    );
+  }
     
     const formData = new FormData();
     formData.append('file', selectedImage);
